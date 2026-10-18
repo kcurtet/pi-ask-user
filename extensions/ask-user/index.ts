@@ -272,9 +272,9 @@ async function runAskForm(
 					const q = currentQuestion();
 					const opts = q.options ?? [];
 					const multi = q.allowMultiple === true;
-					if (matchesKey(data, Key.up) || matchesKey(data, "k")) {
+					if (matchesKey(data, Key.up) || matchesKey(data, "k") || matchesKey(data, "ctrl+p")) {
 						if (opts.length) sel = (sel - 1 + opts.length) % opts.length;
-					} else if (matchesKey(data, Key.down) || matchesKey(data, "j")) {
+					} else if (matchesKey(data, Key.down) || matchesKey(data, "j") || matchesKey(data, "ctrl+n")) {
 						if (opts.length) sel = (sel + 1) % opts.length;
 					} else if (multi && opts.length > 0 && matchesKey(data, Key.space)) {
 						const set = togglesForEdit(q);
@@ -306,9 +306,9 @@ async function runAskForm(
 					}
 				} else if (mode === "summary") {
 					const rows = questions.length + 1;
-					if (matchesKey(data, Key.up) || matchesKey(data, "k")) {
+					if (matchesKey(data, Key.up) || matchesKey(data, "k") || matchesKey(data, "ctrl+p")) {
 						summarySel = (summarySel - 1 + rows) % rows;
-					} else if (matchesKey(data, Key.down) || matchesKey(data, "j")) {
+					} else if (matchesKey(data, Key.down) || matchesKey(data, "j") || matchesKey(data, "ctrl+n")) {
 						summarySel = (summarySel + 1) % rows;
 					} else if (matchesKey(data, Key.enter)) {
 						if (summarySel === questions.length) {
