@@ -55,7 +55,7 @@ async function runAskForm(
 	questions: AskQuestion[],
 	signal: AbortSignal | undefined,
 ): Promise<AskResultPayload> {
-	return await ctx.ui.custom<AskResultPayload>((tui, theme, _kb, done) => {
+	return await ctx.ui.custom<AskResultPayload>((tui, theme, kb, done) => {
 		let finished = false;
 		const finish = (payload: AskResultPayload) => {
 			if (finished) return;
@@ -272,9 +272,9 @@ async function runAskForm(
 					const q = currentQuestion();
 					const opts = q.options ?? [];
 					const multi = q.allowMultiple === true;
-					if (matchesKey(data, Key.up) || matchesKey(data, "k") || matchesKey(data, "ctrl+p")) {
+					if (kb.matches(data, "tui.select.up") || matchesKey(data, "k")) {
 						if (opts.length) sel = (sel - 1 + opts.length) % opts.length;
-					} else if (matchesKey(data, Key.down) || matchesKey(data, "j") || matchesKey(data, "ctrl+n")) {
+					} else if (kb.matches(data, "tui.select.down") || matchesKey(data, "j")) {
 						if (opts.length) sel = (sel + 1) % opts.length;
 					} else if (multi && opts.length > 0 && matchesKey(data, Key.space)) {
 						const set = togglesForEdit(q);
@@ -306,9 +306,9 @@ async function runAskForm(
 					}
 				} else if (mode === "summary") {
 					const rows = questions.length + 1;
-					if (matchesKey(data, Key.up) || matchesKey(data, "k") || matchesKey(data, "ctrl+p")) {
+					if (kb.matches(data, "tui.select.up") || matchesKey(data, "k")) {
 						summarySel = (summarySel - 1 + rows) % rows;
-					} else if (matchesKey(data, Key.down) || matchesKey(data, "j") || matchesKey(data, "ctrl+n")) {
+					} else if (kb.matches(data, "tui.select.down") || matchesKey(data, "j")) {
 						summarySel = (summarySel + 1) % rows;
 					} else if (matchesKey(data, Key.enter)) {
 						if (summarySel === questions.length) {
