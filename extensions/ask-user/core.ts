@@ -153,7 +153,7 @@ export function answerPreview(kind: AnswerKind, value: string | null, max = 48):
 		case "text":
 			return `✎ ${truncatePlain(value ?? "", max)}`;
 		case "defer":
-			return "→ tú decides";
+			return "→ you decide";
 	}
 }
 

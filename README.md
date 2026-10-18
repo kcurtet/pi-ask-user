@@ -4,10 +4,6 @@ A [pi](https://github.com/earendil-works/pi) extension package that registers an
 
 The agent calls `ask_user` with structured questions while preparing a plan or whenever an answer changes the approach. The user answers through a sequential form — pick an option, type free text (including counter-questions), or defer a decision back to the agent — reviews a summary screen, and submits. Results return to the model as a structured tool result with explicit semantics per answer kind.
 
-Designed to stop the model from guessing: ambiguous prompt or any doubt that changes the approach → one form call instead of a wall of chat questions.
-
-> UI strings are in Spanish by design (this is a personal extension). The model-facing result text and `DEFER_INSTRUCTION` are English. PRs welcome if you want an i18n layer.
-
 ## Install
 
 ```bash
@@ -19,15 +15,15 @@ Interactive TUI sessions only. In other modes (headless, web) the tool returns a
 ## The form
 
 ```
-Pregunta 1/3 — Despliegue
-¿Base de datos para el fetcher?
+Question 1/3 — Deployment
+Which database for the fetcher?
 
   ❯ SQLite        ★
-      cero ops, suficiente para un solo operador
+      zero ops, enough for a single operator
   □ Postgres
   □ Neon serverless
 
-  ↑↓ mover · enter elegir · e escribir · r tú decides · tab saltar · esc cancelar
+  ↑↓ move · enter select · e type · r you decide · tab skip · esc cancel
 ```
 
 | Key | Action |
@@ -39,13 +35,13 @@ Pregunta 1/3 — Despliegue
 | `tab` | Skip for now (answer later from the summary) |
 | `esc` `esc` | Cancel the whole form (drafts discarded) |
 
-After the last question a summary screen lists every answer; press `enter` on a row to jump back and edit it, or on `▶ Enviar` to submit. Unanswered questions block submission.
+After the last question a summary screen lists every answer; press `enter` on a row to jump back and edit it, or on `▶ Send` to submit. Unanswered questions block submission.
 
 ## Tool contract
 
 Parameters (validated, hard limits):
 
-- `title` — short form header, ≤ 80 chars (default `Preguntas`)
+- `title` — short form header, ≤ 80 chars (default `Questions`)
 - `questions` — 1–6, unique `id`s
   - `question` ≤ 300 chars, one line
   - `context` ≤ 400 chars, 1–2 lines of why it matters
