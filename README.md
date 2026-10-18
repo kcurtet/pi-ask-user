@@ -28,7 +28,7 @@ Which database for the fetcher?
 
 | Key | Action |
 |---|---|
-| `↑` `↓` / `k` `j` | Move between options |
+| `↑` `↓` / `k` `j` / `ctrl+p` `ctrl+n` | Move between options |
 | `enter` | Pick the highlighted option (or open the text input on free-text questions) |
 | `space` | Toggle an option on multi-select questions (`allowMultiple`) |
 | `e` | Type free text |
