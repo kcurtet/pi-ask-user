@@ -15,22 +15,23 @@ export interface AskQuestion {
 	question: string;
 	context?: string;
 	options?: QuestionOption[];
+	allowMultiple?: boolean;
 	placeholder?: string;
 }
 
-export type AnswerKind = "option" | "text" | "defer";
+export type AnswerKind = "option" | "options" | "text" | "defer";
 
-export interface AskAnswer {
+export type AskAnswer = {
 	id: string;
 	question: string;
 	kind: AnswerKind;
-	value: string | null;
-}
+	value: string | string[] | null;
+};
 
-export interface AskResultPayload {
+export type AskResultPayload = {
 	status: "answered" | "cancelled";
 	answers: AskAnswer[];
-}
+};
 
 const LIMITS = {
 	questions: 6,
@@ -135,8 +136,10 @@ export function formatResultText(payload: AskResultPayload): string {
 		const n = `${i + 1}.`;
 		if (a.kind === "option") {
 			lines.push(`${n} [option] ${a.id} → ${a.value}`);
+		} else if (a.kind === "options") {
+			lines.push(`${n} [options] ${a.id} → ${(a.value as string[]).join(", ")}`);
 		} else if (a.kind === "text") {
-			const note = isCounterQuestion(a.value ?? "") ? " (counter-question from the user — answer it before using this answer)" : "";
+			const note = isCounterQuestion((a.value as string) ?? "") ? " (counter-question from the user — answer it before using this answer)" : "";
 			lines.push(`${n} [text] ${a.id} → "${a.value}"${note}`);
 		} else {
 			lines.push(`${n} [defer] ${a.id} → ${DEFER_INSTRUCTION}`);
@@ -146,12 +149,14 @@ export function formatResultText(payload: AskResultPayload): string {
 }
 
 /** Short human-facing preview of a draft answer, for the summary screen. */
-export function answerPreview(kind: AnswerKind, value: string | null, max = 48): string {
+export function answerPreview(kind: AnswerKind, value: string | string[] | null, max = 48): string {
 	switch (kind) {
 		case "option":
-			return truncatePlain(value ?? "", max);
+			return truncatePlain((value as string) ?? "", max);
+		case "options":
+			return truncatePlain((value as string[]).join(", "), max);
 		case "text":
-			return `✎ ${truncatePlain(value ?? "", max)}`;
+			return `✎ ${truncatePlain((value as string) ?? "", max)}`;
 		case "defer":
 			return "→ you decide";
 	}
