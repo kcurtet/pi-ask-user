@@ -103,3 +103,16 @@ test("answerPreview", () => {
 	assert.equal(answerPreview("defer", null), "→ you decide");
 	assert.equal(answerPreview("text", "x".repeat(60)), `✎ ${"x".repeat(47)}…`);
 });
+
+test("answerPreview: options kind", () => {
+	assert.equal(answerPreview("options", ["api", "worker"]), "api, worker");
+});
+
+test("formatResultText: options kind", () => {
+	const payload: AskResultPayload = {
+		status: "answered",
+		answers: [{ id: "stack", question: "Which parts?", kind: "options", value: ["api", "worker"] }],
+	};
+	const text = formatResultText(payload);
+	assert.ok(text.includes("[options] stack → api, worker"));
+});

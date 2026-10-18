@@ -9,7 +9,13 @@
  */
 
 import { Type } from "@earendil-works/pi-ai";
-import { defineTool, type ExtensionAPI, type ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import {
+	defineTool,
+	type ExtensionAPI,
+	type ExtensionContext,
+	type ExtensionUIContext,
+	Theme,
+} from "@earendil-works/pi-coding-agent";
 import { Input, Key, matchesKey, truncateToWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import {
 	answerPreview,
@@ -21,9 +27,10 @@ import {
 	type AskResultPayload,
 } from "./core.ts";
 
-type Draft = { kind: "option" | "text" | "defer"; value: string | null };
+type Draft = { kind: "option" | "options" | "text" | "defer"; value: string | string[] | null };
 
-const NAV_HELP = "↑↓ move · enter select · e type · r you decide · tab skip · esc cancel";
+const NAV_HELP_SINGLE = "↑↓ move · enter select · e type · r you decide · tab skip · esc cancel";
+const NAV_HELP_MULTI = "↑↓ move · space toggle · enter submit · e type · r you decide · tab skip · esc cancel";
 const TEXT_HELP = "enter save · esc back";
 const SUMMARY_HELP = "↑↓ move · enter edit / send · esc cancel";
 
@@ -64,11 +71,37 @@ async function runAskForm(
 		let escArmed = false;
 		let flash = "";
 		const drafts = new Map<string, Draft>();
+		const toggled = new Map<string, Set<string>>();
+
+		/** Toggles for a multi-select question: saved draft first, else the recommended option. */
+		function deriveToggles(q: AskQuestion): Set<string> {
+			const d = drafts.get(q.id);
+			if (d?.kind === "options") return new Set(d.value as string[]);
+			const set = new Set<string>();
+			const rec = (q.options ?? []).find((o) => o.recommended);
+			if (rec) set.add(rec.label);
+			return set;
+		}
+
+		/** Read-only view for rendering (does not persist derived state). */
+		function currentToggles(q: AskQuestion): Set<string> {
+			return toggled.get(q.id) ?? deriveToggles(q);
+		}
+
+		/** Persisting view for input handlers. */
+		function togglesForEdit(q: AskQuestion): Set<string> {
+			let set = toggled.get(q.id);
+			if (!set) {
+				set = deriveToggles(q);
+				toggled.set(q.id, set);
+			}
+			return set;
+		}
 
 		const newInput = (q: AskQuestion): Input => {
 			const d = drafts.get(q.id);
 			const i = new Input({ placeholder: q.placeholder ?? "your answer…" });
-			if (d?.kind === "text") i.setValue(d.value ?? "");
+			if (d?.kind === "text") i.setValue((d.value as string) ?? "");
 			i.onSubmit = (value: string) => {
 				const text = value.trim();
 				if (text) drafts.set(q.id, { kind: "text", value: text });
@@ -149,10 +182,13 @@ async function runAskForm(
 			renderQuestionHeader(w, lines);
 			const q = currentQuestion();
 			const opts = q.options ?? [];
+			const multi = q.allowMultiple === true;
+			const toggles = multi ? currentToggles(q) : undefined;
 			for (const [j, o] of opts.entries()) {
 				const marker = j === sel ? "❯ " : "  ";
+				const box = multi ? `${toggles?.has(o.label) ? "[x]" : "[ ]"} ` : "";
 				const star = o.recommended ? " ★" : "";
-				const line = clip(`${marker}${o.label}${star}`, w);
+				const line = clip(`${marker}${box}${o.label}${star}`, w);
 				lines.push(j === sel ? theme.fg("accent", theme.bold(line)) : line);
 				if (j === sel && o.description) {
 					lines.push(...styledWrapped(o.description, Math.max(8, w - 4), (l) => theme.fg("muted", `    ${l}`)));
@@ -167,7 +203,7 @@ async function runAskForm(
 			const d = drafts.get(q.id);
 			if (d) lines.push("", theme.fg("dim", clip(`saved: ${answerPreview(d.kind, d.value)}`, w)));
 			lines.push("");
-			lines.push(theme.fg("dim", clip(NAV_HELP, w)));
+			lines.push(theme.fg("dim", clip(multi ? NAV_HELP_MULTI : NAV_HELP_SINGLE, w)));
 			if (flash) lines.push(theme.fg("warning", clip(flash, w)));
 			return lines;
 		}
@@ -233,17 +269,32 @@ async function runAskForm(
 				}
 				escArmed = false;
 				if (mode === "nav") {
-					const opts = currentQuestion().options ?? [];
+					const q = currentQuestion();
+					const opts = q.options ?? [];
+					const multi = q.allowMultiple === true;
 					if (matchesKey(data, Key.up) || matchesKey(data, "k")) {
 						if (opts.length) sel = (sel - 1 + opts.length) % opts.length;
 					} else if (matchesKey(data, Key.down) || matchesKey(data, "j")) {
 						if (opts.length) sel = (sel + 1) % opts.length;
+					} else if (multi && opts.length > 0 && matchesKey(data, Key.space)) {
+						const set = togglesForEdit(q);
+						const label = opts[sel].label;
+						if (set.has(label)) set.delete(label);
+						else set.add(label);
 					} else if (matchesKey(data, Key.enter)) {
-						if (opts.length) {
-							drafts.set(currentQuestion().id, { kind: "option", value: opts[sel].label });
-							advance();
-						} else {
+						if (!opts.length) {
 							openText();
+						} else if (multi) {
+							const set = togglesForEdit(q);
+							if (set.size === 0) {
+								flash = "toggle at least one option with space";
+							} else {
+								drafts.set(q.id, { kind: "options", value: [...set] });
+								advance();
+							}
+						} else {
+							drafts.set(q.id, { kind: "option", value: opts[sel].label });
+							advance();
 						}
 					} else if (matchesKey(data, "e")) {
 						openText();
@@ -284,8 +335,7 @@ async function runAskForm(
 
 // ---------- tool definition ----------
 
-const parameters = Type.Object({
-	title: Type.Optional(Type.String({ description: "Short form title shown in the header (default: 'Questions')" })),
+const parameters = Type.Object({	title: Type.Optional(Type.String({ description: "Short form title shown in the header (default: 'Questions')" })),
 	questions: Type.Array(
 		Type.Object({
 			id: Type.String({ description: "Short stable snake_case id" }),
@@ -302,6 +352,11 @@ const parameters = Type.Object({
 					{ description: "2-6 choices; omit for free-text-only questions" },
 				),
 			),
+			allowMultiple: Type.Optional(
+				Type.Boolean({
+					description: "Allow selecting multiple options with space. TUI form only; fallback dialogs treat it as single-select",
+				}),
+			),
 			placeholder: Type.Optional(Type.String({ description: "Hint for the free-text input" })),
 		}),
 		{ description: "1-6 questions, unique ids; keep text short, long context goes in chat before calling" },
@@ -314,27 +369,30 @@ const outputSchema = Type.Object({
 		Type.Object({
 			id: Type.String(),
 			question: Type.String(),
-			kind: Type.Union([Type.Literal("option"), Type.Literal("text"), Type.Literal("defer")]),
-			value: Type.Union([Type.String(), Type.Null()]),
+			kind: Type.Union([Type.Literal("option"), Type.Literal("options"), Type.Literal("text"), Type.Literal("defer")]),
+			value: Type.Union([Type.String(), Type.Null(), Type.Array(Type.String())]),
 		}),
 	),
 });
 
-const askUserTool = defineTool({
+const askUserTool = (pi: ExtensionAPI) =>
+	defineTool({
 	name: "ask_user",
 	label: "Ask user",
-	description: `Interactive question form for the user, shown in the terminal UI. Use while preparing a plan or whenever the answer changes the approach. The user picks an option, types free text (including counter-questions), or defers a decision to you. Put long context in the chat BEFORE calling — keep form text short (question ≤ 1 line, context ≤ 2 lines). Mark recommended on the single technically strongest option only with a real technical basis, always with a short rationale; for pure preference calls mark none. Deferred decisions come back with instructions: help the user decide (explain trade-offs, ask what they need), and only if unresolved choose yourself and mark it "recommended, not confirmed" in the plan. Interactive TUI only; in other modes ask in chat.`,
+	description: `Interactive question form for the user, shown in the terminal UI. Use while preparing a plan or whenever the answer changes the approach. The user picks an option, selects several (allowMultiple), types free text (including counter-questions), or defers a decision to you. Put long context in the chat BEFORE calling — keep form text short (question ≤ 1 line, context ≤ 2 lines). Mark recommended on the single technically strongest option only with a real technical basis, always with a short rationale; for pure preference calls mark none. Deferred decisions come back with instructions: help the user decide (explain trade-offs, ask what they need), and only if unresolved choose yourself and mark it "recommended, not confirmed" in the plan. Interactive TUI preferred; RPC falls back to plain dialogs; otherwise ask in chat.`,
 	promptSnippet: "ask_user — interactive question form for plan and decision input",
+	promptGuidelines: [
+		"Put long context in the chat BEFORE calling; keep form text short (question one line, context 1-2 lines).",
+		"Ask related decisions together in one call (up to 6 questions); omit options for free-text-only questions.",
+		"Mark recommended on the single technically strongest option only, always with a rationale; for pure preference calls mark none.",
+	],
+	// Block other tool calls in the same assistant turn until the user answers,
+	// so side effects cannot run before the user sees the form.
+	executionMode: "sequential",
 	parameters,
 	outputSchema,
 	annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
 	execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
-		if (ctx.mode !== "tui") {
-			return {
-				content: [{ type: "text", text: "ask_user requires the interactive TUI. Ask the questions in plain chat instead." }],
-				isError: true,
-			};
-		}
 		const questions = params.questions as AskQuestion[];
 		const title = params.title ?? "Questions";
 		const titleError = validateTitle(title);
@@ -342,6 +400,7 @@ const askUserTool = defineTool({
 			return {
 				content: [{ type: "text", text: `Invalid ask_user arguments:\n- ${titleError}` }],
 				isError: true,
+				details: undefined,
 			};
 		}
 		const errors = validateQuestions(questions);
@@ -349,9 +408,20 @@ const askUserTool = defineTool({
 			return {
 				content: [{ type: "text", text: `Invalid ask_user arguments:\n- ${errors.join("\n- ")}` }],
 				isError: true,
+				details: undefined,
 			};
 		}
-		const payload = await runAskForm(ctx, title, questions, signal);
+		if (ctx.mode !== "tui" && !ctx.hasUI) {
+			return {
+				content: [{ type: "text", text: "ask_user requires an interactive UI. Ask the questions in plain chat instead." }],
+				isError: true,
+				details: undefined,
+			};
+		}
+		const payload =
+			ctx.mode === "tui"
+				? await whileBlocked(pi, () => runAskForm(ctx, title, questions, signal))
+				: await whileBlocked(pi, () => runFallbackDialogs(ctx.ui, title, questions, signal));
 		if (signal?.aborted) {
 			return {
 				content: [{ type: "text", text: formatResultText({ status: "cancelled", answers: [] }) }],
@@ -383,8 +453,51 @@ const askUserTool = defineTool({
 		];
 		return simpleComponent(lines);
 	},
-});
+	});
+
+/** Report the session as blocked on the user (`herdr:blocked`) while awaiting answers. */
+async function whileBlocked<T>(pi: ExtensionAPI, run: () => Promise<T>): Promise<T> {
+	pi.events.emit("herdr:blocked", { active: true, label: "Waiting for user response" });
+	try {
+		return await run();
+	} finally {
+		pi.events.emit("herdr:blocked", { active: false });
+	}
+}
+
+const FREE_TEXT_ROW = "✎ Type an answer";
+const DEFER_ROW = "→ You decide";
+
+/** RPC/headless fallback: ask each question with plain dialogs instead of the form. */
+async function runFallbackDialogs(
+	ui: ExtensionUIContext,
+	title: string,
+	questions: AskQuestion[],
+	signal: AbortSignal | undefined,
+): Promise<AskResultPayload> {
+	const answers: AskAnswer[] = [];
+	for (const q of questions) {
+		if (signal?.aborted) return { status: "cancelled", answers };
+		const display = (q.options ?? []).map((o) => (o.recommended ? `${o.label} ★` : o.label));
+		const choice =
+			display.length > 0
+				? await ui.select(`${title} — ${q.question}`, [...display, FREE_TEXT_ROW, DEFER_ROW], { signal })
+				: FREE_TEXT_ROW;
+		if (choice === undefined) return { status: "cancelled", answers };
+		if (choice === DEFER_ROW) {
+			answers.push({ id: q.id, question: q.question, kind: "defer", value: null });
+		} else if (choice === FREE_TEXT_ROW) {
+			const text = await ui.input(q.question, q.placeholder ?? "your answer…", { signal });
+			if (text === undefined || !text.trim()) return { status: "cancelled", answers };
+			answers.push({ id: q.id, question: q.question, kind: "text", value: text.trim() });
+		} else {
+			const label = choice.endsWith(" ★") ? choice.slice(0, -2) : choice;
+			answers.push({ id: q.id, question: q.question, kind: "option", value: label });
+		}
+	}
+	return { status: "answered", answers };
+}
 
 export default function (pi: ExtensionAPI): void {
-	pi.registerTool(askUserTool);
+	pi.registerTool(askUserTool(pi));
 }
