@@ -158,7 +158,7 @@ export function answerPreview(kind: AnswerKind, value: string | string[] | null,
 		case "text":
 			return `✎ ${truncatePlain((value as string) ?? "", max)}`;
 		case "defer":
-			return "→ you decide";
+			return "→ agent decides";
 	}
 }
 

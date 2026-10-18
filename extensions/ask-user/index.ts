@@ -29,8 +29,8 @@ import {
 
 type Draft = { kind: "option" | "options" | "text" | "defer"; value: string | string[] | null };
 
-const NAV_HELP_SINGLE = "↑↓ move · enter select · e type · r you decide · tab skip · esc cancel";
-const NAV_HELP_MULTI = "↑↓ move · space toggle · enter submit · e type · r you decide · tab skip · esc cancel";
+const NAV_HELP_SINGLE = "↑↓ move · enter select · e type · r agent decides · tab skip · esc cancel";
+const NAV_HELP_MULTI = "↑↓ move · space toggle · enter submit · e type · r agent decides · tab skip · esc cancel";
 const TEXT_HELP = "enter save · esc back";
 const SUMMARY_HELP = "↑↓ move · enter edit / send · esc cancel";
 
@@ -448,7 +448,7 @@ const askUserTool = (pi: ExtensionAPI) =>
 		const answered = p.answers.filter((a) => a.kind !== "defer").length;
 		const deferred = p.answers.length - answered;
 		const lines = [
-			theme.fg("success", theme.bold(`✓ answered ${answered} · you decide ${deferred}`)),
+			theme.fg("success", theme.bold(`✓ answered ${answered} · agent decides ${deferred}`)),
 			...p.answers.map((a) => theme.fg("muted", `  ${a.id}: ${answerPreview(a.kind, a.value, 60)}`)),
 		];
 		return simpleComponent(lines);
@@ -466,7 +466,7 @@ async function whileBlocked<T>(pi: ExtensionAPI, run: () => Promise<T>): Promise
 }
 
 const FREE_TEXT_ROW = "✎ Type an answer";
-const DEFER_ROW = "→ You decide";
+const DEFER_ROW = "→ Agent decides";
 
 /** RPC/headless fallback: ask each question with plain dialogs instead of the form. */
 async function runFallbackDialogs(

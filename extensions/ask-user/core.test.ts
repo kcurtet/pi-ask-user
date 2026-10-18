@@ -100,7 +100,7 @@ test("formatResultText: cancelled", () => {
 
 test("answerPreview", () => {
 	assert.equal(answerPreview("option", "PostgreSQL"), "PostgreSQL");
-	assert.equal(answerPreview("defer", null), "→ you decide");
+	assert.equal(answerPreview("defer", null), "→ agent decides");
 	assert.equal(answerPreview("text", "x".repeat(60)), `✎ ${"x".repeat(47)}…`);
 });
 
