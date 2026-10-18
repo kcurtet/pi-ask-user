@@ -13,7 +13,7 @@ import {
 
 const q = (overrides: Partial<AskQuestion> = {}): AskQuestion => ({
 	id: "q1",
-	question: "¿Base de datos?",
+	question: "Which database?",
 	...overrides,
 });
 
@@ -37,7 +37,7 @@ test("validateQuestions: too many questions rejected", () => {
 });
 
 test("validateTitle", () => {
-	assert.equal(validateTitle("Preguntas"), null);
+	assert.equal(validateTitle("Questions"), null);
 	assert.equal(validateTitle("x".repeat(81))?.includes("title too long"), true);
 });
 
@@ -69,26 +69,26 @@ test("validateQuestions: duplicate labels rejected", () => {
 });
 
 test("isCounterQuestion", () => {
-	assert.equal(isCounterQuestion("¿y si crece el tráfico?"), true);
-	assert.equal(isCounterQuestion("¿y si crece el tráfico? "), true);
-	assert.equal(isCounterQuestion("usa PostgreSQL"), false);
+	assert.equal(isCounterQuestion("what if traffic grows?"), true);
+	assert.equal(isCounterQuestion("what if traffic grows? "), true);
+	assert.equal(isCounterQuestion("use PostgreSQL"), false);
 });
 
 test("formatResultText: answered with all kinds", () => {
 	const payload: AskResultPayload = {
 		status: "answered",
 		answers: [
-			{ id: "db", question: "¿DB?", kind: "option", value: "PostgreSQL" },
-			{ id: "notes", question: "¿Algo más?", kind: "text", value: "¿y si el tráfico crece 10x?" },
-			{ id: "notes2", question: "¿Algo?", kind: "text", value: "sin preguntar" },
-			{ id: "auth", question: "¿Auth?", kind: "defer", value: null },
+			{ id: "db", question: "DB?", kind: "option", value: "PostgreSQL" },
+			{ id: "notes", question: "Anything else?", kind: "text", value: "what if traffic grows 10x?" },
+			{ id: "notes2", question: "Something?", kind: "text", value: "no question here" },
+			{ id: "auth", question: "Auth?", kind: "defer", value: null },
 		],
 	};
 	const text = formatResultText(payload);
 	assert.ok(text.startsWith("status: answered"));
 	assert.ok(text.includes('[option] db → PostgreSQL'));
 	assert.ok(text.includes("counter-question"));
-	assert.ok(text.includes('"sin preguntar"'));
+	assert.ok(text.includes('"no question here"'));
 	assert.ok(text.includes(`[defer] auth → ${DEFER_INSTRUCTION}`));
 });
 
@@ -100,6 +100,6 @@ test("formatResultText: cancelled", () => {
 
 test("answerPreview", () => {
 	assert.equal(answerPreview("option", "PostgreSQL"), "PostgreSQL");
-	assert.equal(answerPreview("defer", null), "→ tú decides");
+	assert.equal(answerPreview("defer", null), "→ you decide");
 	assert.equal(answerPreview("text", "x".repeat(60)), `✎ ${"x".repeat(47)}…`);
 });

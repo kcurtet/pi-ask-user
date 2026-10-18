@@ -23,9 +23,9 @@ import {
 
 type Draft = { kind: "option" | "text" | "defer"; value: string | null };
 
-const NAV_HELP = "↑↓ mover · enter elegir · e escribir · r tú decides · tab saltar · esc cancelar";
-const TEXT_HELP = "enter guardar · esc volver";
-const SUMMARY_HELP = "↑↓ mover · enter editar / enviar · esc cancelar";
+const NAV_HELP = "↑↓ move · enter select · e type · r you decide · tab skip · esc cancel";
+const TEXT_HELP = "enter save · esc back";
+const SUMMARY_HELP = "↑↓ move · enter edit / send · esc cancel";
 
 function simpleComponent(lines: string[]) {
 	return {
@@ -60,14 +60,14 @@ async function runAskForm(
 		let mode: "nav" | "text" | "summary" = "nav";
 		let returnToSummary = false;
 		let sel = initialSelection(questions[0]);
-		let summarySel = questions.length; // rows 0..n-1 = questions, n = Enviar
+		let summarySel = questions.length; // rows 0..n-1 = questions, n = Send
 		let escArmed = false;
 		let flash = "";
 		const drafts = new Map<string, Draft>();
 
 		const newInput = (q: AskQuestion): Input => {
 			const d = drafts.get(q.id);
-			const i = new Input({ placeholder: q.placeholder ?? "tu respuesta…" });
+			const i = new Input({ placeholder: q.placeholder ?? "your answer…" });
 			if (d?.kind === "text") i.setValue(d.value ?? "");
 			i.onSubmit = (value: string) => {
 				const text = value.trim();
@@ -138,7 +138,7 @@ async function runAskForm(
 
 		function renderQuestionHeader(w: number, lines: string[]): void {
 			const q = currentQuestion();
-			lines.push(theme.fg("dim", clip(`Pregunta ${idx + 1}/${questions.length} — ${title}`, w)));
+			lines.push(theme.fg("dim", clip(`Question ${idx + 1}/${questions.length} — ${title}`, w)));
 			lines.push(...styledWrapped(q.question, w, (l) => theme.fg("accent", theme.bold(l))));
 			if (q.context) lines.push(...styledWrapped(q.context, w, (l) => theme.fg("muted", l)));
 			lines.push("");
@@ -162,10 +162,10 @@ async function runAskForm(
 				}
 			}
 			if (opts.length === 0) {
-				lines.push(theme.fg("muted", clip("  respuesta libre — pulsa e para escribir", w)));
+				lines.push(theme.fg("muted", clip("  free text — press e to type", w)));
 			}
 			const d = drafts.get(q.id);
-			if (d) lines.push("", theme.fg("dim", clip(`guardado: ${answerPreview(d.kind, d.value)}`, w)));
+			if (d) lines.push("", theme.fg("dim", clip(`saved: ${answerPreview(d.kind, d.value)}`, w)));
 			lines.push("");
 			lines.push(theme.fg("dim", clip(NAV_HELP, w)));
 			if (flash) lines.push(theme.fg("warning", clip(flash, w)));
@@ -183,11 +183,11 @@ async function runAskForm(
 
 		function renderSummary(w: number): string[] {
 			const lines: string[] = [];
-			lines.push(theme.fg("accent", theme.bold(`Resumen — ${questions.length} pregunta${questions.length === 1 ? "" : "s"}`)));
+			lines.push(theme.fg("accent", theme.bold(`Summary — ${questions.length} question${questions.length === 1 ? "" : "s"}`)));
 			lines.push("");
 			for (const [i, q] of questions.entries()) {
 				const d = drafts.get(q.id);
-				const ans = d ? answerPreview(d.kind, d.value) : "(sin responder)";
+				const ans = d ? answerPreview(d.kind, d.value) : "(unanswered)";
 				const row = `${i === summarySel ? "❯ " : "  "}${truncateToWidth(`${q.id}: ${ans}`, Math.max(10, w - 2))}`;
 				if (!d) lines.push(theme.fg("warning", row));
 				else if (i === summarySel) lines.push(theme.fg("accent", row));
@@ -195,13 +195,13 @@ async function runAskForm(
 			}
 			const u = unanswered();
 			const ready = u.length === 0;
-			const sendRow = `${summarySel === questions.length ? "❯ " : "  "}▶ Enviar`;
+			const sendRow = `${summarySel === questions.length ? "❯ " : "  "}▶ Send`;
 			lines.push("");
 			lines.push(ready ? theme.fg("success", theme.bold(sendRow)) : theme.fg("dim", sendRow));
 			lines.push("");
 			lines.push(theme.fg("dim", clip(SUMMARY_HELP, w)));
 			if (flash) lines.push(theme.fg("warning", clip(flash, w)));
-			else if (!ready) lines.push(theme.fg("warning", clip(`faltan: ${u.map((q) => q.id).join(", ")}`, w)));
+			else if (!ready) lines.push(theme.fg("warning", clip(`missing: ${u.map((q) => q.id).join(", ")}`, w)));
 			return lines;
 		}
 
@@ -227,7 +227,7 @@ async function runAskForm(
 						return;
 					}
 					escArmed = true;
-					flash = "esc otra vez = descartar todo";
+					flash = "esc again = discard all";
 					tui.requestRender();
 					return;
 				}
@@ -262,7 +262,7 @@ async function runAskForm(
 					} else if (matchesKey(data, Key.enter)) {
 						if (summarySel === questions.length) {
 							if (unanswered().length > 0) {
-								flash = `sin responder: ${unanswered().map((q) => q.id).join(", ")}`;
+								flash = `unanswered: ${unanswered().map((q) => q.id).join(", ")}`;
 							} else {
 								submit();
 								return;
@@ -285,7 +285,7 @@ async function runAskForm(
 // ---------- tool definition ----------
 
 const parameters = Type.Object({
-	title: Type.Optional(Type.String({ description: "Short form title shown in the header (default: 'Preguntas')" })),
+	title: Type.Optional(Type.String({ description: "Short form title shown in the header (default: 'Questions')" })),
 	questions: Type.Array(
 		Type.Object({
 			id: Type.String({ description: "Short stable snake_case id" }),
@@ -336,7 +336,7 @@ const askUserTool = defineTool({
 			};
 		}
 		const questions = params.questions as AskQuestion[];
-		const title = params.title ?? "Preguntas";
+		const title = params.title ?? "Questions";
 		const titleError = validateTitle(title);
 		if (titleError) {
 			return {
@@ -367,18 +367,18 @@ const askUserTool = defineTool({
 	},
 	renderCall: (args, theme: Theme) =>
 		simpleComponent([
-			theme.fg("accent", `❓ ${args.questions.length} pregunta(s)${args.title ? ` — ${args.title}` : ""}`),
+			theme.fg("accent", `❓ ${args.questions.length} question(s)${args.title ? ` — ${args.title}` : ""}`),
 		]),
 	renderResult: (result, _options, theme: Theme) => {
 		const p = result.details as AskResultPayload | undefined;
 		if (!p) return simpleComponent([theme.fg("dim", "ask_user")]);
 		if (p.status === "cancelled") {
-			return simpleComponent([theme.fg("error", "✗ cancelado por el usuario")]);
+			return simpleComponent([theme.fg("error", "✗ cancelled by user")]);
 		}
 		const answered = p.answers.filter((a) => a.kind !== "defer").length;
 		const deferred = p.answers.length - answered;
 		const lines = [
-			theme.fg("success", theme.bold(`✓ respondidas ${answered} · tú decides ${deferred}`)),
+			theme.fg("success", theme.bold(`✓ answered ${answered} · you decide ${deferred}`)),
 			...p.answers.map((a) => theme.fg("muted", `  ${a.id}: ${answerPreview(a.kind, a.value, 60)}`)),
 		];
 		return simpleComponent(lines);
