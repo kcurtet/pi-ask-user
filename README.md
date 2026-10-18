@@ -23,7 +23,7 @@ Which database for the fetcher?
   □ Postgres
   □ Neon serverless
 
-  ↑↓ move · enter select · e type · r you decide · tab skip · esc cancel
+  ↑↓ move · enter select · e type · r agent decides · tab skip · esc cancel
 ```
 
 | Key | Action |
