@@ -1,0 +1,27 @@
+{
+	"name": "pi-ask-user",
+	"version": "0.1.0",
+	"description": "pi extension package: ask_user — interactive question form for plan and decision input",
+	"keywords": [
+		"pi-package"
+	],
+	"type": "module",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+ssh://github.com/kcurtet/pi-ask-user.git"
+	},
+	"pi": {
+		"extensions": [
+			"./extensions/ask-user/index.ts"
+		]
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-ai": "*",
+		"@earendil-works/pi-coding-agent": "*",
+		"@earendil-works/pi-tui": "*"
+	},
+	"devDependencies": {
+		"@types/node": "^22"
+	}
+}
