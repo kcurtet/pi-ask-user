@@ -8,6 +8,7 @@
  * Results return to the model as a structured tool result.
  */
 
+import { execFile } from "node:child_process";
 import { Type } from "@earendil-works/pi-ai";
 import {
 	defineTool,
@@ -34,6 +35,18 @@ const NAV_HELP_MULTI = "↑↓ move · space toggle · enter submit · e type ·
 const TEXT_HELP = "enter save · esc back";
 const SUMMARY_HELP = "↑↓ move · enter edit / send · esc cancel";
 
+/** Plays a notification sound so the user notices the form. No-op if paplay is missing. */
+function playNotifySound() {
+	if (process.env.PI_ASK_USER_NO_SOUND) return;
+	execFile(
+		"paplay",
+		["/usr/share/sounds/freedesktop/stereo/complete.oga"],
+		() => {
+			/* sound is best-effort */
+		},
+	);
+}
+
 function simpleComponent(lines: string[]) {
 	return {
 		render(width: number) {
@@ -55,6 +68,7 @@ async function runAskForm(
 	questions: AskQuestion[],
 	signal: AbortSignal | undefined,
 ): Promise<AskResultPayload> {
+	playNotifySound();
 	return await ctx.ui.custom<AskResultPayload>((tui, theme, kb, done) => {
 		let finished = false;
 		const finish = (payload: AskResultPayload) => {
