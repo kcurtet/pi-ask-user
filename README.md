@@ -51,7 +51,7 @@ Parameters (validated, hard limits):
   - `options` — 2–6 per question; omit for free-text-only
     - `label` ≤ 80, `description` ≤ 200 (shown when highlighted)
     - `recommended` — at most **one** per question, and it **must** carry a `rationale` (≤ 300). Intended for the single technically strongest option with a real basis — not for pure preference calls.
-  - `allowMultiple` — multi-select with `space`; the recommended option starts pre-toggled. TUI form only: fallback dialogs treat it as single-select.
+  - `allowMultiple` — multi-select with `space`; the recommended option starts pre-toggled. RPC fallback: a toggle loop (pick options one at a time, `✓ Done` to confirm).
 
 Answer kinds in the result:
 
@@ -61,6 +61,8 @@ Answer kinds in the result:
 - `defer` — the user handed the decision back; the result embeds instructions: explain trade-offs and ask what they still need; only if it stays unresolved, pick the most technically sound option and mark it `recommended, not confirmed` in the plan
 
 Long context belongs in chat **before** the call — form text stays short.
+
+An empty free-text answer re-prompts the same question; it never discards answers already given. Cancelling a dialog cancels the whole form.
 
 ## Layout
 

@@ -42,6 +42,7 @@ const LIMITS = {
 	label: 80,
 	description: 200,
 	rationale: 300,
+	placeholder: 120,
 } as const;
 
 /** Instruction embedded in the tool result for every deferred question. */
@@ -77,6 +78,11 @@ export function validateQuestions(questions: unknown): string[] {
 		}
 		if (q.context !== undefined && q.context.length > LIMITS.context) {
 			errors.push(`${at}: context too long (max ${LIMITS.context} chars)`);
+		}
+		if (q.placeholder !== undefined && (typeof q.placeholder !== "string" || !q.placeholder.trim())) {
+			errors.push(`${at}: placeholder must be a non-empty string`);
+		} else if (q.placeholder !== undefined && q.placeholder.length > LIMITS.placeholder) {
+			errors.push(`${at}: placeholder too long (max ${LIMITS.placeholder} chars)`);
 		}
 		const opts = q.options;
 		if (opts !== undefined) {
