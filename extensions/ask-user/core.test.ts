@@ -41,6 +41,12 @@ test("validateTitle", () => {
 	assert.equal(validateTitle("x".repeat(81))?.includes("title too long"), true);
 });
 
+test("validateQuestions: placeholder validation", () => {
+	assert.deepEqual(validateQuestions([q({ placeholder: "e.g. main branch" })]), []);
+	assert.ok(validateQuestions([q({ placeholder: "x".repeat(121) })]).some((e) => e.includes("placeholder too long")));
+	assert.ok(validateQuestions([q({ placeholder: "   " })]).some((e) => e.includes("placeholder")));
+});
+
 test("validateQuestions: single option rejected", () => {
 	const errors = validateQuestions([q({ options: [{ label: "solo" }] })]);
 	assert.ok(errors.some((e) => e.includes("at least 2")));

@@ -434,8 +434,8 @@ const askUserTool = (pi: ExtensionAPI) =>
 		}
 		const payload =
 			ctx.mode === "tui"
-				? await whileBlocked(pi, () => runAskForm(ctx, title, questions, signal))
-				: await whileBlocked(pi, () => runFallbackDialogs(ctx.ui, title, questions, signal));
+				? await whileBlocked(pi, title, () => runAskForm(ctx, title, questions, signal))
+				: await whileBlocked(pi, title, () => runFallbackDialogs(ctx.ui, title, questions, signal));
 		if (signal?.aborted) {
 			return {
 				content: [{ type: "text", text: formatResultText({ status: "cancelled", answers: [] }) }],
@@ -470,8 +470,8 @@ const askUserTool = (pi: ExtensionAPI) =>
 	});
 
 /** Report the session as blocked on the user (`herdr:blocked`) while awaiting answers. */
-async function whileBlocked<T>(pi: ExtensionAPI, run: () => Promise<T>): Promise<T> {
-	pi.events.emit("herdr:blocked", { active: true, label: "Waiting for user response" });
+async function whileBlocked<T>(pi: ExtensionAPI, title: string, run: () => Promise<T>): Promise<T> {
+	pi.events.emit("herdr:blocked", { active: true, label: `Waiting for user response: ${title}` });
 	try {
 		return await run();
 	} finally {
@@ -481,6 +481,7 @@ async function whileBlocked<T>(pi: ExtensionAPI, run: () => Promise<T>): Promise
 
 const FREE_TEXT_ROW = "✎ Type an answer";
 const DEFER_ROW = "→ Agent decides";
+const DONE_ROW = "✓ Done";
 
 /** RPC/headless fallback: ask each question with plain dialogs instead of the form. */
 async function runFallbackDialogs(
@@ -492,6 +493,17 @@ async function runFallbackDialogs(
 	const answers: AskAnswer[] = [];
 	for (const q of questions) {
 		if (signal?.aborted) return { status: "cancelled", answers };
+		const multi = q.allowMultiple === true && (q.options?.length ?? 0) > 0;
+		if (multi) {
+			const res = await multiSelect(ui, title, q, signal);
+			if (res === undefined) return { status: "cancelled", answers };
+			if (res.kind === "defer") {
+				answers.push({ id: q.id, question: q.question, kind: "defer", value: null });
+			} else {
+				answers.push({ id: q.id, question: q.question, kind: "options", value: res.value });
+			}
+			continue;
+		}
 		const display = (q.options ?? []).map((o) => (o.recommended ? `${o.label} ★` : o.label));
 		const choice =
 			display.length > 0
@@ -501,15 +513,61 @@ async function runFallbackDialogs(
 		if (choice === DEFER_ROW) {
 			answers.push({ id: q.id, question: q.question, kind: "defer", value: null });
 		} else if (choice === FREE_TEXT_ROW) {
-			const text = await ui.input(q.question, q.placeholder ?? "your answer…", { signal });
-			if (text === undefined || !text.trim()) return { status: "cancelled", answers };
-			answers.push({ id: q.id, question: q.question, kind: "text", value: text.trim() });
+			// An empty answer re-prompts the same question; it never discards
+			// the answers already collected.
+			const text = await promptNonEmpty(ui, q, signal);
+			if (text === undefined) return { status: "cancelled", answers };
+			answers.push({ id: q.id, question: q.question, kind: "text", value: text });
 		} else {
 			const label = choice.endsWith(" ★") ? choice.slice(0, -2) : choice;
 			answers.push({ id: q.id, question: q.question, kind: "option", value: label });
 		}
 	}
 	return { status: "answered", answers };
+}
+
+/** Multi-select fallback: toggle options one at a time until Done. undefined = cancel. */
+async function multiSelect(
+	ui: ExtensionUIContext,
+	title: string,
+	q: AskQuestion,
+	signal: AbortSignal | undefined,
+): Promise<{ kind: "options"; value: string[] } | { kind: "defer" } | undefined> {
+	const picked: string[] = [];
+	const display = (q.options ?? []).map((o) => (o.recommended ? `${o.label} ★` : o.label));
+	// eslint-disable-next-line no-constant-condition
+	while (true) {
+		if (signal?.aborted) return undefined;
+		const status = picked.length > 0 ? ` (picked: ${picked.join(", ")})` : "";
+		const choice = await ui.select(`${title} — ${q.question}${status}`, [...display, DONE_ROW, FREE_TEXT_ROW, DEFER_ROW], { signal });
+		if (choice === undefined) return undefined;
+		if (choice === DONE_ROW) return { kind: "options", value: picked };
+		if (choice === DEFER_ROW) return { kind: "defer" };
+		if (choice === FREE_TEXT_ROW) {
+			const text = await promptNonEmpty(ui, q, signal);
+			if (text === undefined) return undefined;
+			return { kind: "options", value: [text] };
+		}
+		const label = choice.endsWith(" ★") ? choice.slice(0, -2) : choice;
+		const i = picked.indexOf(label);
+		if (i >= 0) picked.splice(i, 1);
+		else picked.push(label);
+	}
+}
+
+/** Re-prompt until non-empty; undefined only on explicit cancel (dialog returns undefined). */
+async function promptNonEmpty(
+	ui: ExtensionUIContext,
+	q: AskQuestion,
+	signal: AbortSignal | undefined,
+): Promise<string | undefined> {
+	// eslint-disable-next-line no-constant-condition
+	while (true) {
+		const text = await ui.input(q.question, q.placeholder ?? "your answer…", { signal });
+		if (text === undefined) return undefined;
+		const t = text.trim();
+		if (t) return t;
+	}
 }
 
 export default function (pi: ExtensionAPI): void {
