@@ -68,19 +68,21 @@ An empty free-text answer re-prompts the same question; it never discards answer
 
 ```
 extensions/ask-user/
-├── index.ts        # tool definition + TUI form (pi, pi-tui imports)
+├── index.ts        # tool definition + TUI form (rendering + key mapping only)
 ├── core.ts         # pure validation + result formatting, no pi imports
-└── core.test.ts    # node --test unit tests
+├── form-state.ts   # pure form state machine (modes, drafts, toggles)
+├── core.test.ts    # node --test unit tests
+└── form-state.test.ts
 ```
 
-Pure logic lives in `core.ts` so it stays unit-testable with plain `node --test` (no pi runtime needed).
+Pure logic lives in `core.ts` and `form-state.ts` so it stays unit-testable with plain `node --test` (no pi runtime needed): validation/result formatting and the form state machine respectively.
 
 ## Development
 
 ```bash
 npm install
 npm exec tsc -- --noEmit   # typecheck against pinned pi packages
-node --test extensions/ask-user/core.test.ts
+node --test extensions/ask-user/core.test.ts extensions/ask-user/form-state.test.ts
 ```
 
 ## License
